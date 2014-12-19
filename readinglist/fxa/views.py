@@ -13,6 +13,7 @@ class FxABlueprint(Blueprint):
     def register(self, app, *args, **kwargs):
         super(FxABlueprint, self).register(app, *args, **kwargs)
         self.client_id = app.config['FXA_CLIENT_ID']
+        self.client_secret = app.config['FXA_CLIENT_SECRET']
         self.redirect_uri = app.config['FXA_REDIRECT_URI']
         self.profile_uri = app.config['FXA_PROFILE_URI']
         self.oauth_uri = app.config['FXA_OAUTH_URI']

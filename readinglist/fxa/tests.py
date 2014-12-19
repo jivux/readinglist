@@ -131,3 +131,88 @@ class VerifyTokenErrorTest(TestCase):
         with self.assertRaises(fxa.OAuth2Error):
             fxa.verify_token(oauth_uri='https://server',
                              token='1234')
+
+
+"""
+
+Views tests
+
+"""
+
+from flask.ext.webtest import TestApp
+from readinglist.run import app
+
+
+class TestBase(object):
+    def setUp(self):
+        self.app = app
+        self.app.config['SECRET_KEY'] = 'secret-key-for-sessions'
+        self.w = TestApp(self.app, db=app.data.driver, use_session_scopes=True)
+
+
+class LoginViewTest(TestBase, TestCase):
+    url = '/v1/fxa-oauth/login'
+
+    def test_login_view_persists_state_in_session(self):
+        r = self.w.get(self.url)
+        self.assertIsNotNone(r.session.get('state'))
+
+    @mock.patch('readinglist.fxa.views.uuid.uuid4')
+    def test_login_view_redirects_to_authorization(self, mocked_uuid):
+        mocked_uuid.return_value = mock.MagicMock(hex='1234')
+        expected_redirect = (
+            'https://oauth.accounts.firefox.com/v1/authorization?action=signin'
+            '&client_id=&state=1234&scope=profile')
+
+        r = self.w.get(self.url)
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r.headers['Location'], expected_redirect)
+
+
+class ParamsViewTest(TestBase, TestCase):
+    url = '/v1/fxa-oauth/params'
+
+    def test_login_view_persists_state_in_session(self):
+        r = self.w.get(self.url)
+        self.assertIsNotNone(r.session.get('state'))
+
+    def test_provide_oauth_parameters_and_state(self):
+        r = self.w.get(self.url)
+        self.assertEqual(sorted(r.json.keys()),
+            ['client_id', 'oauth_uri', 'profile_uri', 'redirect_uri',
+             'scope', 'state'])
+
+
+class TokenViewTest(TestBase, TestCase):
+    url = '/v1/fxa-oauth/token'
+
+    def test_fails_if_no_ongoing_session(self):
+        self.w.get(self.url, status=401)
+
+    def test_fails_if_state_or_code_is_missing(self):
+        with app.test_client() as c:
+            for params in ['', '?state=abc', '?code=1234']:
+                with c.session_transaction() as sess:
+                    sess['state'] = 'abc'
+                r = c.get(self.url + params)
+                self.assertEqual(r.status_code, 400)
+
+    def test_fails_if_state_does_not_match(self):
+        with app.test_client() as c:
+            with c.session_transaction() as sess:
+                sess['state'] = 'abc'
+            r = c.get(self.url + '?state=def&code=1234')
+            self.assertEqual(r.status_code, 400)
+
+    @mock.patch('readinglist.fxa.views.trade_code')
+    def tests_returns_token_traded_against_code(self, mocked_trade):
+        mocked_trade.return_value = 'oauth-token'
+
+        with app.test_client() as c:
+            with c.session_transaction() as sess:
+                sess['state'] = 'abc'
+            r = c.get(self.url + '?state=abc&code=1234')
+
+            self.assertEqual(r.status_code, 200)
+            token = json.loads(r.data)['token']
+            self.assertEqual(token, 'oauth-token')
