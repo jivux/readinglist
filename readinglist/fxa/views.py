@@ -31,12 +31,12 @@ def persist_state():
     return state
 
 
-@fxa.route("/fxa-oauth/login")
+@fxa.route("/login")
 def fxa_oauth_login():
     """Helper to redirect client towards FxA login form.
     """
     state = persist_state()
-    form_url = ('{oauth_uri}/autorization?action=signin'
+    form_url = ('{oauth_uri}/authorization?action=signin'
                 '&client_id={client_id}&state={state}&scope={scope}')
     form_url = form_url.format(oauth_uri=fxa.oauth_uri,
                                client_id=fxa.client_id,
@@ -45,7 +45,7 @@ def fxa_oauth_login():
     return redirect(form_url)
 
 
-@fxa.route("/fxa-oauth/params")
+@fxa.route("/params")
 def fxa_oauth_params():
     """Create session and provide the OAuth parameters to the client.
     """
@@ -62,7 +62,7 @@ def fxa_oauth_params():
     return response
 
 
-@fxa.route("/fxa-oauth/token")
+@fxa.route("/token")
 def fxa_oauth_token():
     """Return OAuth token from authorization code.
     """
