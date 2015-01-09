@@ -16,6 +16,7 @@ class Memory(BackendBase):
 
     def create(self, resource, user_id, record):
         _id = record['_id'] = self.id_generator()
+        record['_owner'] = user_id
         self._store[resource][user_id][_id] = record
         return record
 

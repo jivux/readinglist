@@ -60,10 +60,35 @@ class Oauth2AuthenticationPolicy(base_auth.CallbackAuthenticationPolicy):
         return profile
 
 
+class RootFactory(object):
+    def __init__(self, request):
+        user_id = request.authenticated_userid
+        matchdict = request.matchdict or {}
+        record_id = matchdict.get('id')
+        resource_name = 'article'  # XXX ?
+
+        self.record = None
+        if user_id and record_id:
+            try:
+                self.record = request.db.get(resource=resource_name,
+                                             record_id=record_id,
+                                             user_id=user_id)
+            except:
+                pass
+
+
 @implementer(IAuthorizationPolicy)
 class AuthorizationPolicy(object):
     def permits(self, context, principals, permission):
-        return permission in principals
+        if permission not in principals:
+            return False
+
+        if context.record is None:
+            return True
+
+        owner = context.record['_owner']
+        print owner, principals
+        return owner in principals
 
     def principals_allowed_by_permission(self, context, permission):
         raise NotImplementedError()  # PRAGMA NOCOVER

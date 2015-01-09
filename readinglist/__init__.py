@@ -16,7 +16,8 @@ API_VERSION = 'v%s' % __version__.split('.')[0]
 
 
 def main(global_config, **settings):
-    config = Configurator(settings=settings)
+    config = Configurator(settings=settings,
+                          root_factory=authentication.RootFactory)
     config.route_prefix = '/%s' % API_VERSION
 
     backend_module = config.maybe_dotted(settings['readinglist.backend'])

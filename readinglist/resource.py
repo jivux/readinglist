@@ -2,6 +2,7 @@ import json
 
 import pyramid.httpexceptions
 import colander
+from cornice.resource import view
 
 from readinglist.backend.exceptions import RecordNotFoundError
 

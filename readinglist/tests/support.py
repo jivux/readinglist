@@ -173,6 +173,18 @@ class BaseResourceAuthorizationTest(BaseWebTest):
         self.app.patch(url, {}, status=403)
         self.app.delete(url, status=403)
 
+    def test_cannot_delete_others_records(self):
+        # Duplicate bob's record into alices
+        alice_rec = self.db.create(self.resource, u'alice', self.record)
+        alice_rec['_owner'] = 'bob'
+        self.db.update(self.resource, u'alice', alice_rec['_id'], alice_rec)
+
+        self.fxa_verify.return_value = {
+            'user': 'alice'
+        }
+        url = self.item_url.format(self.record['_id'])
+        self.app.delete(url, headers=self.headers, status=401)
+
 
 class BaseResourceTest(BaseResourceViewsTest, BaseResourceAuthorizationTest):
     pass
