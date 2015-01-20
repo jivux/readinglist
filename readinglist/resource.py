@@ -127,10 +127,23 @@ class BaseResource(object):
 
         for param, value in queryparams.items():
             value = native_value(value)
-            if param in self.known_fields:
-                filters.append((param, value, '=='))
             if param == '_since':
                 filters.append((self.modified_field, value, '>='))
+                continue
+
+            if param == '_sort':
+                continue
+
+            if param not in self.known_fields:
+                error_details = {
+                    'name': None,
+                    'location': 'querystring',
+                    'description': "Unknown filter field '{0}'".format(param)
+                }
+                self.request.errors.add(**error_details)
+                return
+
+            filters.append((param, value, '=='))
 
         return filters
 
@@ -142,8 +155,19 @@ class BaseResource(object):
             m = re.match(r'\s?([\-+]?)(\w+)\s?', field)
             if m:
                 order, field = m.groups()
+
+                if field not in self.known_fields:
+                    error_details = {
+                        'name': None,
+                        'location': 'querystring',
+                        'description': "Unknown sort field '{0}'".format(field)
+                    }
+                    self.request.errors.add(**error_details)
+                    return
+
                 direction = -1 if order == '-' else 1
                 sorting.append((field, direction))
+
         return sorting
 
     def merge_fields(self, changes):
