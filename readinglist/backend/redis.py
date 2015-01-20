@@ -1,48 +1,76 @@
-import operator
-from operator import itemgetter
-from collections import defaultdict
+import cjson
+import redis
+import time
 
 from readinglist.backend import BackendBase, exceptions
 from readinglist.utils import classname
 
 
-tree = lambda: defaultdict(tree)
+class Redis(BackendBase):
 
-
-class Memory(BackendBase):
     def __init__(self, *args, **kwargs):
-        super(Memory, self).__init__(*args, **kwargs)
-        self._store = tree()
+        super(Redis, self).__init__(*args, **kwargs)
+        self._client = redis.StrictRedis(**kwargs)
+
+    def _encode(self, record):
+        return cjson.encode(record)
+
+    def _decode(self, record):
+        return cjson.decode(record)
 
     def flush(self):
-        pass
+        self._client.flushdb()
 
     def ping(self):
-        return True
+        try:
+            self._client.setex('heartbeat', 3600, time.time())
+            return True
+        except redis.RedisError:
+            return False
 
     def create(self, resource, user_id, record):
         resource_name = classname(resource)
         _id = record[resource.id_field] = self.id_generator()
-        self._store[resource_name][user_id][_id] = record
+        with self._client.pipeline() as multi:
+            multi.set(
+                '{0}.{1}.{1}'.format(resource_name, user_id, _id),
+                self._encode(record)
+            )
+            multi.sadd(
+                '{0}.{1}'.format(resource_name, user_id),
+                _id
+            )
+            multi.execute()
+
         return record
 
     def get(self, resource, user_id, record_id):
         resource_name = classname(resource)
-        collection = self._store[resource_name][user_id]
-        if record_id not in collection:
-            raise exceptions.RecordNotFoundError(record_id)
-        return collection[record_id]
+
+        return self._decode(self._client.get(
+            '{0}.{1}.{2}'.format(resource_name, user_id, record_id))
+        )
 
     def update(self, resource, user_id, record_id, record):
         resource_name = classname(resource)
-        self._store[resource_name][user_id][record_id] = record
-        return record
+        self._client.set(
+            '{0}.{1}.{1}'.format(resource_name, user_id, record_id),
+            self._encode(record)
+        )
 
     def delete(self, resource, user_id, record_id):
         resource_name = classname(resource)
-        existing = self.get(resource, user_id, record_id)
-        self._store[resource_name][user_id].pop(record_id)
-        return existing
+        with self._client.pipeline() as multi:
+            multi.delete(
+                '{0}.{1}.{1}'.format(resource_name, user_id, record_id))
+
+            multi.srem(
+                '{0}.{1}'.format(resource_name, user_id),
+                record_id
+            )
+            responses = multi.execute()
+
+        return responses[1] == 1
 
     def get_all(self, resource, user_id, filters=None, sorting=None):
         resource_name = classname(resource)
@@ -77,7 +105,3 @@ class Memory(BackendBase):
             result = sorted(result, key=itemgetter(field), reverse=reverse)
 
         return result
-
-
-def load_from_config(config):
-    return Memory()
