@@ -234,6 +234,24 @@ class BaseResourceViewsTest(BaseWebTest):
         url = self.item_url.format(id='unknown')
         self.app.delete(url, headers=self.headers, status=404)
 
+    def test_cannot_modify_id(self):
+        url = self.item_url.format(id=self.record['_id'])
+        body = {'_id': 999}
+        resp = self.app.patch_json(url, body, headers=self.headers, status=400)
+        self.assertFormattedError(
+            resp, 400, ERRORS.INVALID_PARAMETERS,
+            "Invalid parameters",
+            "Cannot modify _id")
+
+    def test_cannot_modify_last_modified(self):
+        url = self.item_url.format(id=self.record['_id'])
+        body = {'last_modified': 12345}
+        resp = self.app.patch_json(url, body, headers=self.headers, status=400)
+        self.assertFormattedError(
+            resp, 400, ERRORS.INVALID_PARAMETERS,
+            "Invalid parameters",
+            "Cannot modify last_modified")
+
 
 class BaseResourceAuthorizationTest(BaseWebTest):
     def test_all_views_require_authentication(self):
