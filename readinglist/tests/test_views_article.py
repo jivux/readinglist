@@ -82,6 +82,21 @@ class ArticleFilteringTest(BaseWebTest, unittest.TestCase):
         resp = self.app.get('/articles?title=MoFo', headers=self.headers)
         self.assertEqual(len(resp.json['items']), 6)
 
+    def test_different_value(self):
+        resp = self.app.get('/articles?not_status=2', headers=self.headers)
+        values = [item['status'] for item in resp.json['items']]
+        self.assertTrue(all([value != 2 for value in values]))
+
+    def test_minimal_value(self):
+        resp = self.app.get('/articles?min_status=2', headers=self.headers)
+        values = [item['status'] for item in resp.json['items']]
+        self.assertTrue(all([value >= 2 for value in values]))
+
+    def test_maximal_value(self):
+        resp = self.app.get('/articles?max_status=2', headers=self.headers)
+        values = [item['status'] for item in resp.json['items']]
+        self.assertTrue(all([value <= 2 for value in values]))
+
 
 class ArticleFilterModifiedTest(BaseWebTest, unittest.TestCase):
 

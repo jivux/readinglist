@@ -127,9 +127,23 @@ class BaseResource(object):
 
         for param, value in queryparams.items():
             value = native_value(value)
-            if param in self.known_fields:
-                filters.append((param, value, '=='))
-            if param == '_since':
+
+            m = re.match(r'\s?(min|max|not)_(\w+)\s?', param)
+            if m:
+                keyword, field = m.groups()
+                operators = {
+                    'min': '>=',
+                    'max': '<=',
+                    'not': '!='
+                }
+                operator = operators[keyword]
+            else:
+                operator, field = '==', param
+
+            if field in self.known_fields:
+                filters.append((field, value, operator))
+
+            if field == '_since':
                 filters.append((self.modified_field, value, '>='))
 
         return filters
